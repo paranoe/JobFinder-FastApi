@@ -27,7 +27,7 @@ class City(Base):
     __tablename__ = 'cities'
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    name: Mapped[str] = mapped_column(String, nullable=False)
+    name: Mapped[str] = mapped_column(String, nullable=False, unique=True)
 
     applicants: Mapped[List["Applicant"]] = relationship(back_populates="city")
 
@@ -36,7 +36,7 @@ class Role(Base):
     __tablename__ = 'roles'
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    name: Mapped[str] = mapped_column(String, nullable=False)
+    name: Mapped[str] = mapped_column(String, nullable=False, unique=True)
 
     users: Mapped[List["User"]] = relationship(back_populates="role")
 
@@ -107,10 +107,38 @@ class Profession(Base):
     __tablename__ = 'professions'
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    name: Mapped[str] = mapped_column(String, nullable=False)
+    name: Mapped[str] = mapped_column(String, nullable=False, unique=True)
 
     vacancies: Mapped[List["Vacancy"]] = relationship(back_populates="profession")
     resumes: Mapped[List["Resume"]] = relationship(back_populates="profession")
+
+
+class EmploymentType(Base):
+    __tablename__ = 'employment_types'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String, nullable=False, unique=True)  
+
+    vacancies: Mapped[List["Vacancy"]] = relationship(back_populates="employment_type")
+
+
+class WorkSchedule(Base):
+    __tablename__ = 'work_schedules'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String, nullable=False, unique=True)  
+
+    vacancies: Mapped[List["Vacancy"]] = relationship(back_populates="work_schedule")
+
+
+class Skill(Base):
+    __tablename__ = 'skills'
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
+    name: Mapped[str] = mapped_column(String, nullable=False, unique=True)
+
+    vacancies: Mapped[List["Vacancy"]] = relationship(secondary=vacancy_skills, back_populates="skills")
+    resumes: Mapped[List["Resume"]] = relationship(secondary=resume_skills, back_populates="skills")
 
 
 class Vacancy(Base):
@@ -128,43 +156,16 @@ class Vacancy(Base):
     updated_at: Mapped[Optional[datetime]] = mapped_column(DateTime)
     company_id: Mapped[int] = mapped_column(Integer, ForeignKey('companies.id'), nullable=False)
     profession_id: Mapped[int] = mapped_column(Integer, ForeignKey('professions.id'), nullable=False)
+    
+    employment_type_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey('employment_types.id'))
+    work_schedule_id: Mapped[Optional[int]] = mapped_column(Integer, ForeignKey('work_schedules.id'))
 
     company: Mapped["Company"] = relationship(back_populates="vacancies")
     profession: Mapped["Profession"] = relationship(back_populates="vacancies")
-    employment_types: Mapped[List["EmploymentType"]] = relationship(back_populates="vacancy")
-    work_schedules: Mapped[List["WorkSchedule"]] = relationship(back_populates="vacancy")
+    employment_type: Mapped[Optional["EmploymentType"]] = relationship(back_populates="vacancies")
+    work_schedule: Mapped[Optional["WorkSchedule"]] = relationship(back_populates="vacancies")
     skills: Mapped[List["Skill"]] = relationship(secondary=vacancy_skills, back_populates="vacancies")
     applications: Mapped[List["Application"]] = relationship(back_populates="vacancy")
-
-
-class EmploymentType(Base):
-    __tablename__ = 'employment_types'
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    vacancy_id: Mapped[int] = mapped_column(Integer, ForeignKey('vacancies.id'), nullable=False)
-    name: Mapped[str] = mapped_column(String, nullable=False)
-
-    vacancy: Mapped["Vacancy"] = relationship(back_populates="employment_types")
-
-
-class WorkSchedule(Base):
-    __tablename__ = 'work_schedules'
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    vacancy_id: Mapped[int] = mapped_column(Integer, ForeignKey('vacancies.id'), nullable=False)
-    name: Mapped[str] = mapped_column(String, nullable=False)
-
-    vacancy: Mapped["Vacancy"] = relationship(back_populates="work_schedules")
-
-
-class Skill(Base):
-    __tablename__ = 'skills'
-
-    id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    name: Mapped[str] = mapped_column(String, nullable=False, unique=True)
-
-    vacancies: Mapped[List["Vacancy"]] = relationship(secondary=vacancy_skills, back_populates="skills")
-    resumes: Mapped[List["Resume"]] = relationship(secondary=resume_skills, back_populates="skills")
 
 
 class Resume(Base):
@@ -189,7 +190,7 @@ class Application(Base):
 
     vacancy_id: Mapped[int] = mapped_column(Integer, ForeignKey('vacancies.id'), primary_key=True)
     resume_id: Mapped[int] = mapped_column(Integer, ForeignKey('resumes.id'), primary_key=True)
-    status: Mapped[Optional[str]] = mapped_column(String)
+    status: Mapped[Optional[str]] = mapped_column(String, unique=True, default='pending')
 
     vacancy: Mapped["Vacancy"] = relationship(back_populates="applications")
     resume: Mapped["Resume"] = relationship(back_populates="applications")

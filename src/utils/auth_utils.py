@@ -2,7 +2,7 @@ from src.core.config import setting
 from fastapi import HTTPException, status
 from datetime import datetime, timedelta
 from jose import JWTError, jwt
-
+import uuid
 
 class JWTToken:
     
@@ -12,7 +12,8 @@ class JWTToken:
         expire = datetime.now() + (expires_delta or timedelta(minutes=setting.ACCESS_TOKEN_EXPIRE_MINUTES))
         to_encode.update({
             "exp": expire,
-            "type": "access"
+            "type": "access",
+            "jti": str(uuid.uuid4())
         })
         return jwt.encode(to_encode, setting.SECRET_KEY, algorithm=setting.ALGORITHM)
 
@@ -22,7 +23,8 @@ class JWTToken:
         expire = datetime.now() + (expires_delta or timedelta(days=setting.REFRESH_TOKEN_EXPIRE_DAYS))
         to_encode.update({
             "exp": expire,
-            "type": "refresh"
+            "type": "refresh",
+            "jti": str(uuid.uuid4())
         })
         return jwt.encode(to_encode, setting.SECRET_KEY, algorithm=setting.ALGORITHM)
 

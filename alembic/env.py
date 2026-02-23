@@ -7,10 +7,10 @@ from alembic import context
 
 # Импорт моделей (убедитесь, что путь правильный)
 from src.models.model import Base
-
+from dotenv import load_dotenv  
 # Получаем объект конфигурации Alembic
 config = context.config
-
+load_dotenv()
 # Загружаем конфигурацию логирования, если указан файл
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)

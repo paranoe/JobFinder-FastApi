@@ -1,7 +1,7 @@
 from passlib.hash import argon2
 from typing import Optional
 
-class AuthService:
+class HashService:
     ARGON2_MEMORY_COST = 65536  
     ARGON2_TIME_COST = 3        
     ARGON2_PARALLELISM = 4      

@@ -1,49 +1,44 @@
 from fastapi import Depends, HTTPException, status
 from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy import select
-from sqlalchemy.orm import selectinload
+from jose import JWTError  # предполагаем использование python-jose
 
-from src.deps.db_deps import get_db
+from src.deps.db_deps import get_db, get_redis_service
+from src.cruds.user_cruds.user_crud import usercrud
+from src.redis.redis_client import RedisClient
 from src.utils.auth_utils import JWTToken
-from src.models.model import User
 
 security = HTTPBearer()
 
 async def get_current_user(
     credentials: HTTPAuthorizationCredentials = Depends(security),
-    db: AsyncSession = Depends(get_db)
+    db: AsyncSession = Depends(get_db),
+    redis_client: RedisClient = Depends(get_redis_service)
 ):
     token = credentials.credentials
-
     try:
         payload = JWTToken.decode_token(token)
-        user_id = int(payload.get("sub"))
-
-        result = await db.execute(
-            select(User)
-            .where(User.id == user_id)
-            .options(selectinload(User.role))
-        )
-        user = result.scalar_one_or_none()
-
-        if not user:
-            raise HTTPException(
-                status_code=status.HTTP_401_UNAUTHORIZED,
-                detail="Пользователь не найден"
-            )
-
-        # При необходимости можно проверить активность пользователя
-        # if not user.is_active:
-        #     raise HTTPException(
-        #         status_code=status.HTTP_403_FORBIDDEN,
-        #         detail="Пользователь деактивирован"
-        #     )
-
-        return user
-
+        # проверяем тип токена
+        if payload.get("type") != "access":
+            raise HTTPException(status_code=401, detail="Неверный тип токена")
+        user_id_str = payload.get("sub")
+        if not user_id_str:
+            raise HTTPException(status_code=401, detail="Отсутствует идентификатор пользователя")
+        try:
+            user_id = int(user_id_str)
+        except ValueError:
+            raise HTTPException(status_code=401, detail="Некорректный идентификатор пользователя")
+        jti = payload.get("jti")
+        if not jti:
+            raise HTTPException(status_code=401, detail="Отсутствует jti токена")
+        if await redis_client.is_access_jti_blacklisted(jti):
+            raise HTTPException(status_code=401, detail="Токен отозван")
+    except JWTError as e:
+        raise HTTPException(status_code=401, detail=f"Ошибка валидации токена: {str(e)}")
     except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_401_UNAUTHORIZED,
-            detail=f"Невалидный токен: {str(e)}"
-        )
+        raise HTTPException(status_code=401, detail="Ошибка аутентификации")
+
+    user = await usercrud.get(db, user_id)
+    if not user or not user.is_active:
+        raise HTTPException(status_code=401, detail="Пользователь не найден или неактивен")
+    return user

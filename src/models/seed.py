@@ -1,4 +1,5 @@
 import asyncio
+from datetime import datetime
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from src.db.database import async_session
@@ -10,7 +11,9 @@ from src.models.model import (
     WorkSchedule,
     EmploymentType,
     EducationalInstitution,
+    User, 
 )
+from src.core.hash import HashService  
 
 ROLES = [
     {"name": "admin"},
@@ -218,6 +221,34 @@ async def seed_educational_institutions(db: AsyncSession) -> None:
     print("✅ Учреждения образования обработаны.")
 
 
+async def seed_admin_user(db: AsyncSession) -> None:
+    result = await db.execute(select(Role).where(Role.name == "admin"))
+    admin_role = result.scalar_one_or_none()
+    if not admin_role:
+        print("⚠️ Роль admin не найдена, администратор не создан.")
+        return
+
+    existing = await db.execute(
+        select(User).where(User.email == "admin@example.com")
+    )
+    if existing.scalar_one_or_none():
+        print("ℹ️ Администратор уже существует.")
+        return
+
+    hashed_password = HashService.get_password_hash("admin123")
+    admin_user = User(
+        email="admin@example.com",
+        password_hash=hashed_password,
+        role_id=admin_role.id,
+        is_active=True,
+        created_at=datetime.utcnow(),
+        updated_at=datetime.utcnow(),
+    )
+    db.add(admin_user)
+    await db.flush()
+    print("✅ Создан пользователь-администратор (admin@example.com / admin123).")
+
+
 async def seed_all():
     async with async_session() as db:
         await seed_roles(db)
@@ -227,9 +258,10 @@ async def seed_all():
         await seed_work_schedules(db)
         await seed_employment_types(db)
         await seed_educational_institutions(db)
+        await seed_admin_user(db)
 
         await db.commit()
-        print("🎉 Все справочники успешно заполнены.")
+        print("🎉 Все справочники и администратор успешно созданы.")
 
 
 if __name__ == "__main__":
