@@ -1,93 +1,116 @@
-from fastapi import APIRouter, Depends, HTTPException, status
-from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
+from fastapi import APIRouter, Depends, HTTPException, Request, Response
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from src.deps.db_deps import get_db, get_redis_service
+from src.deps.db_deps import get_db
 from src.deps.auth_deps import get_current_user
-from src.cruds.auth_crud import authcrud
-from src.cruds.role_crud import rolecrud
-from src.schemas.auth_schema import UserCreate, UserLogin, TokenResponse, RefreshTokenRequest, LogoutRequest
 from src.services.auth_service import AuthService
-from src.redis.redis_client import RedisClient
-from src.models.model import User
-from src.core.config import setting
-from src.utils.auth_utils import JWTToken
+from src.schemas.auth_schema import UserCreate, UserLogin, TokenResponse, LogoutRequest
+from src.core.exceptions import BaseAppException
+from src.core.config import settings
+from src.utils.logger import logger
 
 auth_router = APIRouter(prefix="/auth", tags=["Authentication"])
-security = HTTPBearer()
 
 @auth_router.post("/register", summary="Регистрация нового пользователя")
 async def register(
     user_data: UserCreate,
     db: AsyncSession = Depends(get_db)
 ):
-    service = AuthService(authcrud, rolecrud)
+    service = AuthService()
     try:
         await service.register(db, user_data)
         return {"msg": "Пользователь успешно зарегистрирован"}
-    except HTTPException:
-        await db.rollback()
-        raise
-    except Exception as e:
-        await db.rollback()
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка регистрации: {str(e)}"
-        )
+    except BaseAppException as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
 
 @auth_router.post("/login", response_model=TokenResponse, summary="Вход в систему")
 async def login(
+    request: Request,
     user_data: UserLogin,
-    db: AsyncSession = Depends(get_db),
-    redis_client: RedisClient = Depends(get_redis_service)
+    db: AsyncSession = Depends(get_db)
 ):
-    service = AuthService(authcrud, rolecrud)
+    service = AuthService()
     try:
-        tokens = await service.login(db, user_data, redis_client)
-        return tokens
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка входа: {str(e)}"
+        tokens = await service.login(db, user_data, request)
+        response = Response()
+        response.set_cookie(
+            key="refresh_token",
+            value=tokens.refresh_token,
+            httponly=True,
+            secure=settings.ENVIRONMENT == "production",
+            samesite="strict",
+            max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60
         )
+        return tokens
+    except BaseAppException as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
 
-@auth_router.post("/refresh", response_model=TokenResponse, summary="Обновление access токена")
+@auth_router.post("/refresh", response_model=TokenResponse, summary="Обновление токенов")
 async def refresh(
-    refresh_request: RefreshTokenRequest,
-    db: AsyncSession = Depends(get_db),
-    redis_client: RedisClient = Depends(get_redis_service)
+    request: Request,
+    db: AsyncSession = Depends(get_db)
 ):
-    service = AuthService(authcrud, rolecrud)
+    refresh_token = request.cookies.get("refresh_token")
+    if not refresh_token:
+        body = await request.json()
+        refresh_token = body.get("refresh_token")
+    if not refresh_token:
+        raise HTTPException(status_code=400, detail="Refresh token required")
+
+    service = AuthService()
     try:
-        tokens = await service.refresh_tokens(refresh_request.refresh_token, db, redis_client)
-        return tokens
-    except HTTPException:
-        raise
-    except Exception as e:
-        raise HTTPException(
-            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail=f"Ошибка при обновлении токена: {str(e)}"
+        tokens = await service.refresh_tokens(refresh_token, request)
+        response = Response()
+        response.set_cookie(
+            key="refresh_token",
+            value=tokens.refresh_token,
+            httponly=True,
+            secure=settings.ENVIRONMENT == "production",
+            samesite="strict",
+            max_age=settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60
         )
+        return tokens
+    except BaseAppException as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
 
 @auth_router.post("/logout")
 async def logout(
-    logout_request: LogoutRequest,
-    credentials: HTTPAuthorizationCredentials = Depends(security),
+    request: Request,
     db: AsyncSession = Depends(get_db),
-    redis_client: RedisClient = Depends(get_redis_service),
-    current_user: User = Depends(get_current_user)
+    current_user = Depends(get_current_user)
 ):
-    access_token = credentials.credentials
-    try:
-        payload = JWTToken.decode_token(access_token)
-        access_jti = payload.get("jti")
-        if not access_jti:
-            raise HTTPException(status_code=401, detail="Отсутствует jti в access токене")
-    except Exception:
-        raise HTTPException(status_code=401, detail="Невалидный access токен")
+    auth_header = request.headers.get("Authorization")
+    if not auth_header or not auth_header.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing access token")
+    access_token = auth_header.split(" ")[1]
 
-    service = AuthService(authcrud, rolecrud)
-    await service.logout(access_jti, current_user.id, logout_request.refresh_token, redis_client)
-    return {"msg": "Успешный выход"}
+    refresh_token = request.cookies.get("refresh_token")
+    if not refresh_token:
+        body = await request.json()
+        refresh_token = body.get("refresh_token")
+    if not refresh_token:
+        raise HTTPException(status_code=400, detail="Refresh token required")
+
+    service = AuthService()
+    try:
+        await service.logout(access_token, current_user.id, refresh_token, request)
+        response = Response()
+        response.delete_cookie("refresh_token")
+        return {"msg": "Успешный выход"}
+    except BaseAppException as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)
+
+@auth_router.post("/logout-all")
+async def logout_all(
+    request: Request,
+    db: AsyncSession = Depends(get_db),
+    current_user = Depends(get_current_user)
+):
+    service = AuthService()
+    try:
+        await service.logout_all(current_user.id)
+        response = Response()
+        response.delete_cookie("refresh_token")
+        return {"msg": "Вы вышли со всех устройств"}
+    except BaseAppException as e:
+        raise HTTPException(status_code=e.status_code, detail=e.message)

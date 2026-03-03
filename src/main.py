@@ -1,28 +1,27 @@
 from fastapi import FastAPI
-import uvicorn
+from contextlib import asynccontextmanager
 
-from src.models.seed import seed_all
-from src.redis.redis_client import RedisClient
 from src.api.v1.router import api_router
+from src.redis.client import redis_client
+from src.redis.auth import session_manager
+from src.core.exceptions import app_exception_handler, BaseAppException
+from src.utils.logger import logger
+from src.models.seed import seed_all
 
-
-app = FastAPI(
-    title="JobFinder",
-    description="Web-service for find job",
-    version="version 1.0.0"
-)
-app.include_router(api_router)
-
-@app.on_event("startup")
-async def startup():
+@asynccontextmanager
+async def lifespan(app: FastAPI):
     await seed_all()
-    redis_client = RedisClient()
     await redis_client.connect()
-    app.state.redis_client = redis_client
+    await session_manager.initialize() 
+    logger.info("Application started")
+    yield
+    await redis_client.close()
+    logger.info("Application stopped")
 
-@app.on_event("shutdown")
-async def shutdown():
-    await app.state.redis_client.close()
+app = FastAPI(lifespan=lifespan, title="Auth Service")
 
-if __name__ == '__main__':
-    uvicorn.run('main:app', host='0.0.0.0', port=8000, reload=True)
+
+app.add_exception_handler(BaseAppException, app_exception_handler)
+
+
+app.include_router(api_router)

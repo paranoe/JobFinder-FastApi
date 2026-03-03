@@ -121,7 +121,7 @@ class User(Base):
     __tablename__ = "users"
 
     id: Mapped[int] = mapped_column(Integer, primary_key=True, index=True)
-    role_id: Mapped[int] = mapped_column(Integer, ForeignKey("roles.id"), unique=True, nullable=False)
+    role_id: Mapped[int] = mapped_column(Integer, ForeignKey("roles.id"), nullable=False)
     email: Mapped[str] = mapped_column(String, nullable=False, unique=True, index=True)
     password: Mapped[str] = mapped_column(String, nullable=False)
     is_active: Mapped[bool] = mapped_column(Boolean, nullable=False)
