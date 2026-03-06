@@ -9,15 +9,15 @@ class CacheService:
             return json.loads(data)
         return None
 
-    async def set(self, key: str, value: Any, ttl: int):
-        await redis_client.client.setex(key, ttl, json.dumps(value))
+    async def set(self, key: str, value: Any, ttl: int = 3600):
+        await redis_client.client.setex(key, ttl, json.dumps(value, default=str))
 
     async def delete(self, key: str):
         await redis_client.client.delete(key)
 
-    async def clear_pattern(self, pattern: str):
+    async def delete_pattern(self, pattern: str):
         keys = await redis_client.client.keys(pattern)
         if keys:
             await redis_client.client.delete(*keys)
 
-cache = CacheService()
+cache_service = CacheService()

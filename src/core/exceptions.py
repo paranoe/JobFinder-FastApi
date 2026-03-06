@@ -43,3 +43,43 @@ async def app_exception_handler(request: Request, exc: BaseAppException):
         status_code=exc.status_code,
         content={"detail": exc.message}
     )
+
+class ApplicantNotFoundError(BaseAppException):
+    def __init__(self, message="Профиль соискателя не найден"):
+        super().__init__(message, status_code=status.HTTP_404_NOT_FOUND)
+
+class ResumeNotFoundError(BaseAppException):
+    def __init__(self, message="Резюме не найдено"):
+        super().__init__(message, status_code=status.HTTP_404_NOT_FOUND)
+
+class VacancyNotFoundError(BaseAppException):
+    def __init__(self, message="Вакансия не найдена"):
+        super().__init__(message, status_code=status.HTTP_404_NOT_FOUND)
+
+class ApplicationNotFoundError(BaseAppException):
+    def __init__(self, message="Отклик не найден"):
+        super().__init__(message, status_code=status.HTTP_404_NOT_FOUND)
+
+class EducationNotFoundError(BaseAppException):
+    def __init__(self, message="Запись об образовании не найдена"):
+        super().__init__(message, status_code=status.HTTP_404_NOT_FOUND)
+
+class AccessDeniedError(BaseAppException):
+    def __init__(self, message="Доступ запрещён"):
+        super().__init__(message, status_code=status.HTTP_403_FORBIDDEN)
+
+class ResumeNotOwnedError(AccessDeniedError):
+    def __init__(self):
+        super().__init__("Резюме не принадлежит текущему пользователю")
+
+class DuplicateApplicationError(BaseAppException):
+    def __init__(self, message="Вы уже откликались на эту вакансию"):
+        super().__init__(message, status_code=status.HTTP_400_BAD_REQUEST)
+
+class VacancyInactiveError(BaseAppException):
+    def __init__(self, message="Вакансия неактивна"):
+        super().__init__(message, status_code=status.HTTP_400_BAD_REQUEST)
+
+class InvalidDateRangeError(BaseAppException):
+    def __init__(self, message="Дата окончания не может быть раньше даты начала"):
+        super().__init__(message, status_code=status.HTTP_400_BAD_REQUEST)

@@ -28,18 +28,19 @@ async def get_current_user(
 
         if await blacklist_manager.is_access_jti_blacklisted(jti):
             raise TokenRevokedError("Токен отозван")
-        
+
         session = await session_manager.get_session(str(user_id), session_id)
         if not session:
             raise TokenRevokedError("Сессия не найдена")
         if session.get("access_jti") != jti:
+            logger.warning(f"🔐 JTI MISMATCH: session jti={session.get('access_jti')}, token jti={jti}")
             raise TokenRevokedError("Токен не соответствует текущей сессии")
 
     except (InvalidTokenError, ExpiredTokenError, TokenRevokedError) as e:
         logger.warning(f"Authentication failed: {e}")
         raise HTTPException(status_code=e.status_code, detail=e.message)
     except Exception as e:
-        logger.error(f"Unexpected auth error: {e}")
+        logger.error(f"Unexpected auth error: {e}", exc_info=True)
         raise HTTPException(status_code=401, detail="Ошибка аутентификации")
 
     user = await authcrud.get_with_role(db, int(user_id))

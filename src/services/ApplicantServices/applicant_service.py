@@ -1,8 +1,7 @@
-from datetime import datetime
+from datetime import datetime, timezone
+from fastapi import HTTPException
 from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi import HTTPException, status
 from sqlalchemy.exc import IntegrityError, SQLAlchemyError
-import logging
 
 from src.cruds.applicant_cruds.applicant_crud import applicantcrud
 from src.cruds.applicant_cruds.resume_crud import resumecrud
@@ -16,9 +15,12 @@ from src.schemas.applicant_schemas.applicant_schema import ApplicantUpdate
 from src.schemas.applicant_schemas.resume_schema import ResumeCreate, ResumeUpdate
 from src.schemas.applicant_schemas.work_experience_schema import WorkExperienceCreate, WorkExperienceUpdate
 from src.schemas.applicant_schemas.education_schema import EducationCreate, EducationUpdate
-from src.models.model import Applicant, Resume
-
-logger = logging.getLogger(__name__)
+from src.models.model import Applicant, Education, Resume, WorkExperience
+from src.core.exceptions import (
+    ApplicantNotFoundError, ResumeNotFoundError, AccessDeniedError,
+    EducationNotFoundError
+)
+from src.utils.logger import logger
 
 class ApplicantService:
     def __init__(self):
@@ -31,27 +33,37 @@ class ApplicantService:
         self.skillcrud = skillcrud
         self.educationalinstitutioncrud = educationalinstitutioncrud
 
-    # ---------- Вспомогательные методы для проверки владения ----------
-    async def _get_resume_or_404(self, db: AsyncSession, resume_id: int, applicant_id: int) -> Resume:
-        resume = await self.resumecrud.get(db, resume_id)
-        if not resume or resume.applicant_id != applicant_id:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Resume not found")
+    # ---------- Вспомогательные методы ----------
+    async def _get_applicant_or_raise(self, db: AsyncSession, user_id: int) -> Applicant:
+        applicant = await self.applicantcrud.get_by_user_id_with_details(db, user_id)
+        if not applicant:
+            raise ApplicantNotFoundError()
+        return applicant
+
+    async def _get_resume_or_raise(self, db: AsyncSession, resume_id: int, applicant_id: int) -> Resume:
+        resume = await self.resumecrud.get_with_details(db, resume_id)
+        if not resume:
+            raise ResumeNotFoundError()
+        if resume.applicant_id != applicant_id:
+            raise AccessDeniedError("Резюме не принадлежит текущему пользователю")
         return resume
 
-    async def _get_work_exp_or_404(self, db: AsyncSession, exp_id: int, resume_id: int, applicant_id: int):
+    async def _get_work_exp_or_raise(self, db: AsyncSession, exp_id: int, resume_id: int, applicant_id: int) -> WorkExperience:
         exp = await self.workexperiencecrud.get(db, exp_id)
-        if not exp or exp.resume_id != resume_id:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Work experience not found")
-        await self._get_resume_or_404(db, resume_id, applicant_id)
+        if not exp:
+            raise HTTPException(status_code=404, detail="Work experience not found")
+        if exp.resume_id != resume_id:
+            raise AccessDeniedError("Опыт работы не принадлежит данному резюме")
+        await self._get_resume_or_raise(db, resume_id, applicant_id)
         return exp
 
     # ---------- Профиль ----------
-    async def get_profile(self, applicant: Applicant):
-        return applicant
+    async def get_profile(self, db: AsyncSession, user_id: int) -> Applicant:
+        return await self._get_applicant_or_raise(db, user_id)
 
-    async def update_profile(self, db: AsyncSession, applicant: Applicant, update_data: ApplicantUpdate):
+    async def update_profile(self, db: AsyncSession, user_id: int, update_data: ApplicantUpdate) -> Applicant:
+        applicant = await self._get_applicant_or_raise(db, user_id)
         try:
-            # Обновляем поля, кроме city_name
             for field, value in update_data.model_dump(exclude_unset=True, exclude={"city_name"}).items():
                 setattr(applicant, field, value)
             if update_data.city_name:
@@ -63,66 +75,63 @@ class ApplicantService:
         except (IntegrityError, SQLAlchemyError) as e:
             await db.rollback()
             logger.error(f"DB error in update_profile: {e}")
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Data error")
+            raise HTTPException(status_code=400, detail="Data error")
         except Exception as e:
             await db.rollback()
             logger.error(f"Unexpected error: {e}", exc_info=True)
-            raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Internal error")
+            raise HTTPException(status_code=500, detail="Internal error")
 
     # ---------- Резюме ----------
-    async def create_resume(self, db: AsyncSession, applicant_id: int, data: ResumeCreate):
+    async def create_resume(self, db: AsyncSession, applicant_id: int, data: ResumeCreate) -> Resume:
         try:
             resume_dict = data.model_dump()
             resume_dict["applicant_id"] = applicant_id
-            resume_dict["created_at"] = resume_dict["updated_at"] = datetime.utcnow()
+            resume_dict["created_at"] = resume_dict["updated_at"] = datetime.now(timezone.utc)
             resume = await self.resumecrud.create(db, resume_dict)
             await db.commit()
             await db.refresh(resume, ["profession", "skills", "work_experiences"])
             return resume
         except IntegrityError:
             await db.rollback()
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid profession_id or duplicate")
+            raise HTTPException(status_code=400, detail="Invalid profession_id or duplicate")
         except Exception as e:
             await db.rollback()
             logger.error(f"Error: {e}")
-            raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Internal error")
+            raise HTTPException(status_code=500, detail="Internal error")
 
-    async def get_resumes(self, db: AsyncSession, applicant_id: int):
-        return await self.resumecrud.get_by_applicant_with_details(db, applicant_id)
+    async def get_resumes(self, db: AsyncSession, applicant_id: int, skip: int = 0, limit: int = 10) -> list[Resume]:
+        return await self.resumecrud.get_by_applicant_with_details_paginated(db, applicant_id, skip, limit)
 
-    async def get_resume_detail(self, db: AsyncSession, resume_id: int, applicant_id: int):
-        resume = await self.resumecrud.get_with_details(db, resume_id)
-        if not resume or resume.applicant_id != applicant_id:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Resume not found")
-        return resume
+    async def get_resume_detail(self, db: AsyncSession, resume_id: int, applicant_id: int) -> Resume:
+        return await self._get_resume_or_raise(db, resume_id, applicant_id)
 
-    async def update_resume(self, db: AsyncSession, resume_id: int, applicant_id: int, data: ResumeUpdate):
-        resume = await self._get_resume_or_404(db, resume_id, applicant_id)
+    async def update_resume(self, db: AsyncSession, resume_id: int, applicant_id: int, data: ResumeUpdate) -> Resume:
+        resume = await self._get_resume_or_raise(db, resume_id, applicant_id)
         try:
             for field, value in data.model_dump(exclude_unset=True).items():
                 setattr(resume, field, value)
-            resume.updated_at = datetime.utcnow()
+            resume.updated_at = datetime.now(timezone.utc)
             await db.commit()
             await db.refresh(resume, ["profession", "skills", "work_experiences"])
             return resume
         except Exception as e:
             await db.rollback()
             logger.error(f"Error: {e}")
-            raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Internal error")
+            raise HTTPException(status_code=500, detail="Internal error")
 
-    async def delete_resume(self, db: AsyncSession, resume_id: int, applicant_id: int):
-        resume = await self._get_resume_or_404(db, resume_id, applicant_id)
+    async def delete_resume(self, db: AsyncSession, resume_id: int, applicant_id: int) -> None:
+        resume = await self._get_resume_or_raise(db, resume_id, applicant_id)
         try:
             await self.resumecrud.delete(db, resume_id)
             await db.commit()
         except Exception as e:
             await db.rollback()
             logger.error(f"Error: {e}")
-            raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Internal error")
+            raise HTTPException(status_code=500, detail="Internal error")
 
     # ---------- Навыки резюме ----------
-    async def add_skill_to_resume(self, db: AsyncSession, resume_id: int, applicant_id: int, skill_name: str):
-        resume = await self._get_resume_or_404(db, resume_id, applicant_id)
+    async def add_skill_to_resume(self, db: AsyncSession, resume_id: int, applicant_id: int, skill_name: str) -> Resume:
+        resume = await self._get_resume_or_raise(db, resume_id, applicant_id)
         try:
             skill = await self.skillcrud.get_or_create(db, skill_name)
             if skill not in resume.skills:
@@ -133,10 +142,10 @@ class ApplicantService:
         except Exception as e:
             await db.rollback()
             logger.error(f"Error: {e}")
-            raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Internal error")
+            raise HTTPException(status_code=500, detail="Internal error")
 
-    async def remove_skill_from_resume(self, db: AsyncSession, resume_id: int, applicant_id: int, skill_id: int):
-        resume = await self._get_resume_or_404(db, resume_id, applicant_id)
+    async def remove_skill_from_resume(self, db: AsyncSession, resume_id: int, applicant_id: int, skill_id: int) -> Resume:
+        resume = await self._get_resume_or_raise(db, resume_id, applicant_id)
         try:
             skill = await self.skillcrud.get(db, skill_id)
             if skill and skill in resume.skills:
@@ -147,10 +156,10 @@ class ApplicantService:
         except Exception as e:
             await db.rollback()
             logger.error(f"Error: {e}")
-            raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Internal error")
+            raise HTTPException(status_code=500, detail="Internal error")
 
-    async def add_skills_batch(self, db: AsyncSession, resume_id: int, applicant_id: int, skill_names: list[str]):
-        resume = await self._get_resume_or_404(db, resume_id, applicant_id)
+    async def add_skills_batch(self, db: AsyncSession, resume_id: int, applicant_id: int, skill_names: list[str]) -> Resume:
+        resume = await self._get_resume_or_raise(db, resume_id, applicant_id)
         try:
             skills_map = await self.skillcrud.get_or_create_many(db, skill_names)
             existing_ids = {s.id for s in resume.skills}
@@ -163,11 +172,11 @@ class ApplicantService:
         except Exception as e:
             await db.rollback()
             logger.error(f"Error: {e}")
-            raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Internal error")
+            raise HTTPException(status_code=500, detail="Internal error")
 
     # ---------- Опыт работы ----------
-    async def add_work_experience(self, db: AsyncSession, resume_id: int, applicant_id: int, data: WorkExperienceCreate):
-        await self._get_resume_or_404(db, resume_id, applicant_id)
+    async def add_work_experience(self, db: AsyncSession, resume_id: int, applicant_id: int, data: WorkExperienceCreate) -> WorkExperience:
+        await self._get_resume_or_raise(db, resume_id, applicant_id)
         try:
             exp_dict = data.model_dump()
             exp_dict["resume_id"] = resume_id
@@ -177,10 +186,10 @@ class ApplicantService:
         except Exception as e:
             await db.rollback()
             logger.error(f"Error: {e}")
-            raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Internal error")
+            raise HTTPException(status_code=500, detail="Internal error")
 
-    async def update_work_experience(self, db: AsyncSession, exp_id: int, resume_id: int, applicant_id: int, data: WorkExperienceUpdate):
-        exp = await self._get_work_exp_or_404(db, exp_id, resume_id, applicant_id)
+    async def update_work_experience(self, db: AsyncSession, exp_id: int, resume_id: int, applicant_id: int, data: WorkExperienceUpdate) -> WorkExperience:
+        exp = await self._get_work_exp_or_raise(db, exp_id, resume_id, applicant_id)
         try:
             updated = await self.workexperiencecrud.update(db, data.model_dump(exclude_unset=True), exp_id)
             await db.commit()
@@ -188,24 +197,22 @@ class ApplicantService:
         except Exception as e:
             await db.rollback()
             logger.error(f"Error: {e}")
-            raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Internal error")
+            raise HTTPException(status_code=500, detail="Internal error")
 
-    async def delete_work_experience(self, db: AsyncSession, exp_id: int, resume_id: int, applicant_id: int):
-        exp = await self._get_work_exp_or_404(db, exp_id, resume_id, applicant_id)
+    async def delete_work_experience(self, db: AsyncSession, exp_id: int, resume_id: int, applicant_id: int) -> None:
+        exp = await self._get_work_exp_or_raise(db, exp_id, resume_id, applicant_id)
         try:
             await self.workexperiencecrud.delete(db, exp_id)
             await db.commit()
         except Exception as e:
             await db.rollback()
             logger.error(f"Error: {e}")
-            raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Internal error")
+            raise HTTPException(status_code=500, detail="Internal error")
 
     # ---------- Образование ----------
-    async def add_education(self, db: AsyncSession, applicant_id: int, data: EducationCreate):
+    async def add_education(self, db: AsyncSession, applicant_id: int, data: EducationCreate) -> Education:
+        applicant = await self._get_applicant_or_raise(db, applicant_id)
         try:
-            applicant = await self.applicantcrud.get(db, applicant_id)
-            if not applicant:
-                raise HTTPException(status.HTTP_404_NOT_FOUND, "Applicant not found")
             institution = await self.educationalinstitutioncrud.get_or_create(db, data.institution_name)
             edu_dict = data.model_dump(exclude={"institution_name"})
             edu_dict["applicant_id"] = applicant_id
@@ -213,25 +220,19 @@ class ApplicantService:
             edu = await self.educationcrud.create(db, edu_dict)
             await db.commit()
             await db.refresh(edu, ["institution"])
-            # Возвращаем словарь с institution_name для корректной сериализации
-            return {
-                "id": edu.id,
-                "institution_name": edu.institution.name,
-                "start_date": edu.start_date,
-                "end_date": edu.end_date
-            }
+            return edu
         except IntegrityError:
             await db.rollback()
-            raise HTTPException(status.HTTP_400_BAD_REQUEST, "Invalid data")
+            raise HTTPException(status_code=400, detail="Invalid data")
         except Exception as e:
             await db.rollback()
             logger.error(f"Error: {e}")
-            raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Internal error")
+            raise HTTPException(status_code=500, detail="Internal error")
 
-    async def update_education(self, db: AsyncSession, edu_id: int, applicant_id: int, data: EducationUpdate):
-        edu = await self.educationcrud.get(db, edu_id)
+    async def update_education(self, db: AsyncSession, edu_id: int, applicant_id: int, data: EducationUpdate) -> Education:
+        edu = await self.educationcrud.get_with_institution(db, edu_id)
         if not edu or edu.applicant_id != applicant_id:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Education not found")
+            raise EducationNotFoundError()
         try:
             if data.institution_name:
                 institution = await self.educationalinstitutioncrud.get_or_create(db, data.institution_name)
@@ -240,28 +241,22 @@ class ApplicantService:
                 setattr(edu, field, value)
             await db.commit()
             await db.refresh(edu, ["institution"])
-            # Возвращаем словарь с institution_name
-            return {
-                "id": edu.id,
-                "institution_name": edu.institution.name,
-                "start_date": edu.start_date,
-                "end_date": edu.end_date
-            }
+            return edu
         except Exception as e:
             await db.rollback()
             logger.error(f"Error: {e}")
-            raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Internal error")
+            raise HTTPException(status_code=500, detail="Internal error")
 
-    async def delete_education(self, db: AsyncSession, edu_id: int, applicant_id: int):
+    async def delete_education(self, db: AsyncSession, edu_id: int, applicant_id: int) -> None:
         edu = await self.educationcrud.get(db, edu_id)
         if not edu or edu.applicant_id != applicant_id:
-            raise HTTPException(status.HTTP_404_NOT_FOUND, "Education not found")
+            raise EducationNotFoundError()
         try:
             await self.educationcrud.delete(db, edu_id)
             await db.commit()
         except Exception as e:
             await db.rollback()
             logger.error(f"Error: {e}")
-            raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Internal error")
+            raise HTTPException(status_code=500, detail="Internal error")
 
 applicant_service = ApplicantService()

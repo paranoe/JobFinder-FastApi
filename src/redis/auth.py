@@ -5,28 +5,34 @@ from src.redis.client import redis_client
 from src.core.config import settings
 from src.utils.logger import logger
 
-
 REFRESH_ROTATION_SCRIPT = """
 local key = KEYS[1]
 local old_refresh = ARGV[1]
 local new_refresh = ARGV[2]
 local new_access_jti = ARGV[3]
 local ttl = ARGV[4]
+local now = ARGV[5]
 
 local session = redis.call('HGETALL', key)
-if #session == 0 then return {0, "session not found"} end
-
-local session_data = {}
-for i = 1, #session, 2 do session_data[session[i]] = session[i+1] end
-
-if session_data['refresh_token'] ~= old_refresh then
-    redis.call('DEL', key)
-    return {0, "refresh token mismatch"}
+if #session == 0 then
+    return {0, "session not found", "", ""}
 end
 
-redis.call('HSET', key, 'refresh_token', new_refresh, 'access_jti', new_access_jti, 'last_used', ARGV[5])
+local session_data = {}
+for i = 1, #session, 2 do
+    session_data[session[i]] = session[i+1]
+end
+
+local stored_refresh = session_data['refresh_token'] or ""
+if stored_refresh ~= old_refresh then
+    redis.call('DEL', key)
+    return {0, "refresh token mismatch", stored_refresh, ""}
+end
+
+redis.call('HSET', key, 'refresh_token', new_refresh, 'access_jti', new_access_jti, 'last_used', now)
 redis.call('EXPIRE', key, ttl)
-return {1, "ok"}
+local new_stored = redis.call('HGET', key, 'refresh_token')
+return {1, "ok", stored_refresh, new_stored}
 """
 
 class SessionManager:
@@ -45,30 +51,37 @@ class SessionManager:
     async def create_session(
         self,
         user_id: str,
+        session_id: str,              # добавляем параметр
         refresh_token: str,
         access_jti: str,
         fingerprint: str = "",
         ttl: int = None
     ) -> str:
-        session_id = str(uuid.uuid4())
         key = self._session_key(user_id, session_id)
         ttl = ttl or settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60
         now = int(time.time())
-        await redis_client.client.hset(key, mapping={
-            "refresh_token": refresh_token,
-            "access_jti": access_jti,
-            "fingerprint": fingerprint,
-            "created_at": now,
-            "last_used": now
-        })
-        await redis_client.client.expire(key, ttl)
-        await redis_client.client.sadd(self._user_sessions_key(user_id), session_id)
-        await redis_client.client.expire(self._user_sessions_key(user_id), ttl)
+        try:
+            await redis_client.client.hset(key, mapping={
+                "refresh_token": refresh_token,
+                "access_jti": access_jti,
+                "fingerprint": fingerprint,
+                "created_at": now,
+                "last_used": now
+            })
+            await redis_client.client.expire(key, ttl)
+            await redis_client.client.sadd(self._user_sessions_key(user_id), session_id)
+            await redis_client.client.expire(self._user_sessions_key(user_id), ttl)
+            logger.info(f"✅ Session created: {key}")
+        except Exception as e:
+            logger.error(f"❌ Error creating session {key}: {e}", exc_info=True)
+            raise
         return session_id
 
     async def get_session(self, user_id: str, session_id: str) -> Optional[Dict]:
         key = self._session_key(user_id, session_id)
+        logger.info(f"🔍 GET_SESSION: looking for key={key}")
         data = await redis_client.client.hgetall(key)
+        logger.info(f"🔍 GET_SESSION: found data={data}")
         if not data:
             return None
         await redis_client.client.hset(key, "last_used", int(time.time()))
@@ -99,20 +112,30 @@ class SessionManager:
         key = self._session_key(user_id, session_id)
         ttl = settings.REFRESH_TOKEN_EXPIRE_DAYS * 24 * 60 * 60
         now = int(time.time())
-        result = await redis_client.client.evalsha(
-            self._rotation_script_hash,
-            1,
-            key,
-            old_refresh,
-            new_refresh,
-            new_access_jti,
-            str(ttl),
-            str(now)
-        )
-        if result[0] == 1:
-            return True
-        else:
-            logger.warning(f"Session rotation failed for user {user_id}, session {session_id}: {result[1]}")
+        logger.info(f"🔄 ROTATE: key={key}, old_refresh={old_refresh[:30]}..., new_access_jti={new_access_jti}")
+        try:
+            result = await redis_client.client.evalsha(
+                self._rotation_script_hash,
+                1,
+                key,
+                old_refresh,
+                new_refresh,
+                new_access_jti,
+                str(ttl),
+                str(now)
+            )
+            # result = [status, message, stored_refresh]
+            status = result[0]
+            message = result[1]
+            stored_refresh = result[2] if len(result) > 2 else ""
+            logger.info(f"🔄 ROTATE result: status={status}, message={message}, stored_refresh={stored_refresh[:30] if stored_refresh else 'None'}...")
+            if status == 1:
+                return True
+            else:
+                logger.warning(f"❌ ROTATE failed: {message}, stored_refresh={stored_refresh[:30] if stored_refresh else 'None'}")
+                return False
+        except Exception as e:
+            logger.error(f"❌ ROTATE exception: {e}", exc_info=True)
             return False
 
     async def delete_session(self, user_id: str, session_id: str):

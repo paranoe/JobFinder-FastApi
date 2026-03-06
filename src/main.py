@@ -10,18 +10,14 @@ from src.models.seed import seed_all
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    await seed_all()
     await redis_client.connect()
-    await session_manager.initialize() 
+    await session_manager.initialize()
+    await seed_all()
     logger.info("Application started")
     yield
     await redis_client.close()
     logger.info("Application stopped")
 
-app = FastAPI(lifespan=lifespan, title="Auth Service")
-
-
-app.add_exception_handler(BaseAppException, app_exception_handler)
-
+app = FastAPI(lifespan=lifespan, title="JobFinder")
 
 app.include_router(api_router)

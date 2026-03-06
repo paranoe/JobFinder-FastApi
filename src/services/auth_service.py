@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 from sqlalchemy.ext.asyncio import AsyncSession
-from fastapi import Request
+from fastapi import HTTPException, Request
 
 from src.core.config import settings
 from src.core.constants import RoleName, TokenType
@@ -83,25 +83,31 @@ class AuthService:
             raise InvalidCredentialsError()
 
         fingerprint = f"{request.headers.get('user-agent', '')}:{client_ip}"
-        session_id = str(uuid.uuid4())
+        session_id = str(uuid.uuid4())   # генерируем один раз
 
+        # Сначала создаём токены с этим session_id
         access_token = JWTToken.create_access_token({"sub": str(user.id)}, session_id)
         refresh_token = JWTToken.create_refresh_token({"sub": str(user.id)}, session_id)
         access_jti = JWTToken.get_jti(access_token)
 
-        await session_manager.create_session(
-            user_id=str(user.id),
-            refresh_token=refresh_token,
-            access_jti=access_jti,
-            fingerprint=fingerprint
-        )
-        await fingerprint_manager.save_fingerprint(str(user.id), fingerprint)
-
-        await session_manager.enforce_max_sessions(str(user.id), settings.MAX_SESSIONS_PER_USER)
+        # Затем создаём сессию в Redis с тем же session_id
+        try:
+            await session_manager.create_session(
+                user_id=str(user.id),
+                session_id=session_id,
+                refresh_token=refresh_token,
+                access_jti=access_jti,
+                fingerprint=fingerprint
+            )
+            await fingerprint_manager.save_fingerprint(str(user.id), fingerprint)
+            await session_manager.enforce_max_sessions(str(user.id), settings.MAX_SESSIONS_PER_USER)
+        except Exception as e:
+            logger.error(f"Failed to create session for user {user.id}: {e}", exc_info=True)
+            raise HTTPException(status_code=500, detail="Failed to create session")
 
         logger.info(f"User logged in: {user.email} (id={user.id}), session={session_id}")
         return TokenResponse(access_token=access_token, refresh_token=refresh_token)
-
+    
     async def refresh_tokens(self, refresh_token: str, request: Request) -> TokenResponse:
         client_ip = request.client.host
         rate_key = f"refresh:{client_ip}"

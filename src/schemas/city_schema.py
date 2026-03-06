@@ -1,7 +1,7 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 
 class CityBase(BaseModel):
-    name: str
+    name: str = Field(..., example="Москва", min_length=2, max_length=100)
 
 class CityCreate(CityBase):
     pass
@@ -9,5 +9,12 @@ class CityCreate(CityBase):
 class CityResponse(CityBase):
     id: int
 
-    class Config:
-        from_attributes = True
+    model_config = {
+        "from_attributes": True,
+        "json_schema_extra": {
+            "example": {
+                "id": 1,
+                "name": "Москва"
+            }
+        }
+    }

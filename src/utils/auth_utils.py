@@ -66,3 +66,12 @@ class JWTToken:
     def get_sid(cls, token: str) -> str:
         payload = cls.decode_token(token)
         return payload["sid"]
+    
+    @classmethod
+    def get_exp(cls, token: str) -> datetime:
+        """Извлекает время истечения токена (exp) как datetime."""
+        payload = cls.decode_token(token)
+        exp = payload.get("exp")
+        if not exp:
+            raise InvalidTokenError("Отсутствует exp в токене")
+        return datetime.fromtimestamp(exp)
