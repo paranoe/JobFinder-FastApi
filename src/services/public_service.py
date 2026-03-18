@@ -1,15 +1,50 @@
-from typing import Optional
+from typing import Any, Optional
 
 from fastapi import HTTPException
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, selectinload
 
-from src.models.model import Status, Vacancy
+from src.models.model import (
+    City,
+    Currency,
+    EducationalInstitution,
+    EmploymentType,
+    Experience,
+    Profession,
+    Skill,
+    Status,
+    Vacancy,
+    WorkSchedule,
+)
 
 
 class PublicService:
     active_status_name = "Активна"
+    catalog_map: dict[str, Any] = {
+        "cities": City,
+        "professions": Profession,
+        "skills": Skill,
+        "currencies": Currency,
+        "experiences": Experience,
+        "work-schedules": WorkSchedule,
+        "employment-types": EmploymentType,
+        "educational-institutions": EducationalInstitution,
+    }
+
+    def _get_catalog_model(self, catalog_name: str):
+        model = self.catalog_map.get(catalog_name)
+        if not model:
+            raise HTTPException(status_code=404, detail="Справочник не найден")
+        return model
+
+    async def get_catalog_items(self, db: AsyncSession, catalog_name: str, skip: int, limit: int):
+        model = self._get_catalog_model(catalog_name)
+        result = await db.execute(select(model).order_by(model.id).offset(skip).limit(limit))
+        return result.scalars().all()
+
+    async def list_catalog_items(self, db: AsyncSession, catalog_name: str, skip: int, limit: int):
+        return await self.get_catalog_items(db, catalog_name, skip, limit)
 
     async def get_vacancies(
         self,

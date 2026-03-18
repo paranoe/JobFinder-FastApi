@@ -42,6 +42,11 @@
 
 Реализованы endpoint’ы, которые не требуют авторизации и дают только просмотр активных вакансий:
 
+- `GET /public/catalogs/{catalog_name}`
+  - публичное чтение справочников для фронтенда соискателя
+  - поддерживаются каталоги: `cities`, `professions`, `skills`, `currencies`, `experiences`, `work-schedules`, `employment-types`, `educational-institutions`
+  - пагинация: `skip`, `limit`
+
 - `GET /public/vacancies`
   - лента активных вакансий
   - поддержка фильтров: `city_id`, `profession_id`, `company_id`, `search`
@@ -63,4 +68,3 @@
 - фильтры + пагинация для таблиц и списков;
 - response-модели, пригодные для админ-панелей и публичной витрины;
 - предсказуемые 404/409/403 сценарии для UI-ошибок.
-

@@ -1,0 +1,306 @@
+:root {
+  --bg: #f4f7fc;
+  --card: #ffffff;
+  --text: #111827;
+  --muted: #64748b;
+  --brand: #1967d2;
+  --brand-dark: #164ea0;
+}
+
+* { box-sizing: border-box; }
+
+body {
+  margin: 0;
+  font-family: Inter, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+  background: linear-gradient(180deg, #f8fbff, #f3f6fb 55%);
+  color: var(--text);
+}
+
+.home-page {
+  max-width: 1260px;
+  margin: 0 auto;
+  padding: 24px;
+}
+
+.topbar {
+  position: sticky;
+  top: 12px;
+  z-index: 40;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 20px;
+  padding: 14px 20px;
+  border-radius: 16px;
+  border: 1px solid #e5e7eb;
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(6px);
+  box-shadow: 0 14px 34px rgba(15, 23, 42, 0.08);
+}
+
+.logo { font-size: 24px; font-weight: 800; color: var(--brand); }
+.topbar nav { display: flex; gap: 16px; flex-wrap: wrap; }
+.topbar nav a { color: var(--text); text-decoration: none; font-weight: 500; }
+.topbar-actions { display: flex; align-items: center; gap: 10px; }
+.login-link { color: var(--brand); text-decoration: none; font-weight: 600; }
+
+.primary-btn,
+.secondary-btn,
+.search-box button {
+  border: 0;
+  border-radius: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.primary-btn,
+.search-box button {
+  background: linear-gradient(135deg, var(--brand), #1d4ed8);
+  color: #fff;
+}
+
+.primary-btn:hover,
+.search-box button:hover {
+  background: linear-gradient(135deg, var(--brand-dark), #1e40af);
+}
+
+.secondary-btn {
+  background: #eff6ff;
+  color: #1e40af;
+  border: 1px solid #bfdbfe;
+}
+
+.secondary-btn:hover {
+  background: #dbeafe;
+}
+
+.favorite-btn {
+  border: 1px solid #cbd5e1;
+  background: #f8fafc;
+  color: #334155;
+  border-radius: 10px;
+  padding: 10px 14px;
+  cursor: pointer;
+  transition: 0.2s ease;
+}
+
+.favorite-btn:hover {
+  border-color: #93c5fd;
+  color: #1d4ed8;
+  background: #eff6ff;
+}
+
+.hero {
+  margin-top: 20px;
+  background: var(--card);
+  border-radius: 22px;
+  border: 1px solid #e5e7eb;
+  padding: 30px;
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  gap: 24px;
+}
+
+.hero-left h1 { margin: 0 0 10px; font-size: 44px; line-height: 1.12; }
+.hero-left p { margin: 0 0 18px; color: var(--muted); line-height: 1.6; }
+
+.hero-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.hero-tags button {
+  border: 0;
+  padding: 7px 12px;
+  border-radius: 999px;
+  background: #e8f1ff;
+  color: #1d4ed8;
+  cursor: pointer;
+}
+
+.hero-stats {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.hero-stats article {
+  border: 1px solid #e2e8f0;
+  border-radius: 12px;
+  background: #f8fafc;
+  padding: 10px 12px;
+}
+
+.hero-stats strong { color: #1d4ed8; font-size: 18px; }
+.hero-stats p { margin: 4px 0 0; color: #475569; font-size: 13px; }
+.hero-image { width: 100%; height: 390px; object-fit: cover; border-radius: 14px; }
+
+.quick-directions {
+  margin-top: 18px;
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+}
+
+.direction-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  padding: 14px;
+}
+
+.direction-card h3 { margin: 0 0 6px; font-size: 17px; }
+.direction-card p { margin: 0 0 8px; color: var(--muted); }
+.direction-card span { color: #1d4ed8; font-weight: 600; font-size: 14px; }
+
+.vacancies-section,
+.companies,
+.benefits { margin-top: 28px; }
+
+.vacancies-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 12px;
+}
+
+.search-box {
+  display: flex;
+  gap: 10px;
+}
+
+.search-box-top {
+  margin-bottom: 12px;
+}
+
+.search-box input {
+  width: 100%;
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 12px;
+}
+
+.info-box,
+.error-box,
+.empty-box {
+  border-radius: 12px;
+  padding: 14px;
+  margin-bottom: 12px;
+  border: 1px solid #dbeafe;
+  background: #eff6ff;
+  color: #1e3a8a;
+}
+
+.error-box {
+  border-color: #fecaca;
+  background: #fef2f2;
+  color: #991b1b;
+}
+
+.empty-box {
+  border-color: #e2e8f0;
+  background: #fff;
+  color: #334155;
+}
+
+.vacancy-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 12px;
+}
+
+.vacancy-card {
+  background: #fff;
+  border-radius: 14px;
+  border: 1px solid #e5e7eb;
+  padding: 14px;
+}
+
+.vacancy-card-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 10px;
+}
+
+.vacancy-card h3 { margin: 0 0 8px; }
+.vacancy-card h3 a {
+  text-decoration: none;
+  color: inherit;
+}
+
+.vacancy-card h3 a:hover {
+  color: #1d4ed8;
+}
+.chip {
+  white-space: nowrap;
+  height: fit-content;
+  background: #eef2ff;
+  color: #3730a3;
+  border-radius: 999px;
+  padding: 4px 8px;
+  font-size: 12px;
+}
+
+.vacancy-meta { margin: 0 0 8px; color: var(--muted); }
+.vacancy-salary { margin: 0 0 8px; color: #1d4ed8; font-weight: 600; }
+.vacancy-desc {
+  margin: 0;
+  color: #374151;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+
+.vacancy-actions {
+  margin-top: 12px;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.section-head h2 { margin: 0; }
+.section-head p { margin: 6px 0 0; color: var(--muted); }
+
+.company-grid,
+.benefit-grid {
+  margin-top: 12px;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 12px;
+}
+
+.company-card,
+.benefit-card {
+  background: #fff;
+  border: 1px solid #e5e7eb;
+  border-radius: 14px;
+  overflow: hidden;
+}
+
+.company-card img { width: 100%; height: 170px; object-fit: cover; }
+.company-card div { padding: 12px; }
+.company-card h3 { margin: 0 0 8px; }
+
+.benefit-card { padding: 14px; }
+.benefit-card h3 { margin: 0 0 8px; }
+.benefit-card p { margin: 0; color: var(--muted); }
+
+@media (max-width: 1024px) {
+  .quick-directions { grid-template-columns: repeat(2, 1fr); }
+  .company-grid,
+  .benefit-grid { grid-template-columns: 1fr 1fr; }
+}
+
+@media (max-width: 900px) {
+  .hero { grid-template-columns: 1fr; }
+  .topbar { flex-wrap: wrap; }
+  .vacancy-grid,
+  .company-grid,
+  .benefit-grid,
+  .quick-directions,
+  .hero-stats { grid-template-columns: 1fr; }
+}
