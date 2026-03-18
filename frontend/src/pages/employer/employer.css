@@ -1,0 +1,200 @@
+.employer-dashboard {
+  min-height: 100vh;
+  background: #f8fafc;
+  color: #0f172a;
+  padding: 32px;
+}
+
+.employer-dashboard .dashboard-header {
+  display: flex;
+  justify-content: space-between;
+  gap: 24px;
+  align-items: flex-start;
+  margin-bottom: 24px;
+}
+
+.employer-dashboard .eyebrow {
+  margin: 0 0 8px;
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+  color: #6366f1;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.employer-dashboard .dashboard-header h1 {
+  margin: 0;
+  font-size: 32px;
+}
+
+.employer-dashboard .subtitle {
+  margin: 10px 0 0;
+  color: #475569;
+}
+
+.employer-dashboard .header-actions,
+.employer-dashboard .row-actions {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.employer-dashboard .stats-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 16px;
+  margin-bottom: 24px;
+}
+
+.employer-dashboard .stat-card,
+.employer-dashboard .panel,
+.employer-dashboard .list-card {
+  background: #fff;
+  border: 1px solid #e2e8f0;
+  border-radius: 20px;
+  box-shadow: 0 12px 30px rgba(15, 23, 42, 0.05);
+}
+
+.employer-dashboard .stat-card {
+  padding: 20px;
+}
+
+.employer-dashboard .stat-card span {
+  display: block;
+  color: #64748b;
+  margin-bottom: 8px;
+}
+
+.employer-dashboard .stat-card strong {
+  font-size: 30px;
+}
+
+.employer-dashboard .dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 20px;
+}
+
+.employer-dashboard .panel {
+  padding: 24px;
+}
+
+.employer-dashboard .panel-head {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+  margin-bottom: 18px;
+}
+
+.employer-dashboard .panel-head h2 {
+  margin: 0;
+}
+
+.employer-dashboard .form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+}
+
+.employer-dashboard .form-grid label {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  color: #334155;
+  font-weight: 600;
+}
+
+.employer-dashboard .form-grid label.full-width {
+  grid-column: 1 / -1;
+}
+
+.employer-dashboard .form-grid input,
+.employer-dashboard .form-grid select,
+.employer-dashboard .form-grid textarea,
+.employer-dashboard .ghost-btn,
+.employer-dashboard .primary-btn,
+.employer-dashboard .danger-btn {
+  border-radius: 14px;
+  font: inherit;
+}
+
+.employer-dashboard .form-grid input,
+.employer-dashboard .form-grid select,
+.employer-dashboard .form-grid textarea {
+  border: 1px solid #cbd5e1;
+  padding: 12px 14px;
+  background: #fff;
+}
+
+.employer-dashboard .primary-btn,
+.employer-dashboard .ghost-btn,
+.employer-dashboard .danger-btn {
+  border: none;
+  padding: 12px 18px;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.employer-dashboard .primary-btn {
+  background: linear-gradient(135deg, #2563eb, #4f46e5);
+  color: #fff;
+}
+
+.employer-dashboard .ghost-btn {
+  background: #e0e7ff;
+  color: #3730a3;
+}
+
+.employer-dashboard .danger-btn {
+  background: #fee2e2;
+  color: #b91c1c;
+}
+
+.employer-dashboard .list-stack {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.employer-dashboard .list-card {
+  padding: 18px;
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+  align-items: center;
+}
+
+.employer-dashboard .list-card p,
+.employer-dashboard .muted {
+  margin: 6px 0 0;
+  color: #64748b;
+}
+
+.employer-dashboard .list-card.selected {
+  border-color: #6366f1;
+  box-shadow: 0 16px 35px rgba(99, 102, 241, 0.12);
+}
+
+.employer-dashboard .compact button {
+  padding: 10px 14px;
+}
+
+@media (max-width: 1100px) {
+  .employer-dashboard .dashboard-grid,
+  .employer-dashboard .form-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+@media (max-width: 720px) {
+  .employer-dashboard {
+    padding: 18px;
+  }
+
+  .employer-dashboard .dashboard-header,
+  .employer-dashboard .list-card {
+    flex-direction: column;
+    align-items: stretch;
+  }
+}

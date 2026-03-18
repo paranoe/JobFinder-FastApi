@@ -1,0 +1,120 @@
+.login-page {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 24px;
+  background: radial-gradient(circle at top, #dbeafe, #f8fafc 55%);
+  font-family: Inter, system-ui, sans-serif;
+}
+
+.login-card {
+  width: min(1020px, 100%);
+  background: #fff;
+  border-radius: 20px;
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: 1.1fr 1fr;
+  box-shadow: 0 20px 60px rgba(15, 23, 42, 0.15);
+}
+
+.login-brand {
+  background: linear-gradient(180deg, #1d4ed8, #1e40af);
+  color: #fff;
+  padding: 28px;
+}
+.login-brand h1 { margin: 0 0 10px; font-size: 34px; }
+.login-brand p { opacity: 0.92; }
+.login-brand img {
+  width: 100%;
+  height: 320px;
+  margin-top: 20px;
+  border-radius: 12px;
+  object-fit: cover;
+}
+
+.login-form-wrap { padding: 34px; }
+.login-form-wrap h2 { margin-top: 0; font-size: 28px; }
+
+.role-switch {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  background: #eff6ff;
+  border-radius: 10px;
+  padding: 4px;
+  margin-bottom: 14px;
+}
+.role-switch button {
+  border: 0;
+  background: transparent;
+  border-radius: 8px;
+  padding: 9px;
+  cursor: pointer;
+  color: #334155;
+  font-weight: 600;
+}
+.role-switch button.active {
+  background: #fff;
+  color: #1d4ed8;
+  box-shadow: 0 1px 3px rgba(15, 23, 42, 0.15);
+}
+
+.login-form { display: grid; gap: 14px; }
+.login-form label { display: grid; gap: 6px; color: #334155; }
+.login-form input {
+  border: 1px solid #cbd5e1;
+  border-radius: 10px;
+  padding: 12px;
+  font-size: 15px;
+}
+.login-form button {
+  margin-top: 4px;
+  border: 0;
+  border-radius: 10px;
+  padding: 12px;
+  color: white;
+  background: #1967d2;
+  font-size: 16px;
+  font-weight: 600;
+  cursor: pointer;
+}
+.login-form button:disabled { opacity: 0.7; cursor: not-allowed; }
+.form-error {
+  margin: 0;
+  color: #b91c1c;
+  font-size: 14px;
+  background: #fef2f2;
+  border: 1px solid #fecaca;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+.form-success {
+  margin: 0;
+  color: #166534;
+  font-size: 14px;
+  background: #f0fdf4;
+  border: 1px solid #bbf7d0;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
+.hint { color: #64748b; margin-top: 16px; }
+
+@media (max-width: 860px) {
+  .login-card { grid-template-columns: 1fr; }
+  .login-brand img { height: 220px; }
+}
+
+.field-error {
+  color: #b91c1c;
+  font-size: 13px;
+}
+
+.form-info {
+  margin: 0;
+  color: #1e3a8a;
+  font-size: 14px;
+  background: #eff6ff;
+  border: 1px solid #bfdbfe;
+  border-radius: 8px;
+  padding: 8px 10px;
+}
